@@ -34,7 +34,7 @@
             <h1 id="controls-title">ascii cam</h1>
             <button class="close-button" id="controls-close" type="button" aria-label="Close controls">×</button>
           </header>
-          <button class="start-button" id="camera-toggle" type="button">
+          <button class="start-button" id="camera-toggle" type="button" disabled>
             <span class="button-icon" aria-hidden="true">▶</span>
             <span>start camera</span>
           </button>
@@ -48,8 +48,9 @@
           </select>
           <label class="field-label" for="camera-select">camera</label>
           <select id="camera-select" aria-label="Camera source">
-            <option value="">default camera</option>
+            <option value="" disabled selected>checking cameras</option>
           </select>
+          <button class="camera-access-button" id="camera-access" type="button" hidden>allow camera access</button>
           <label class="field-label" for="character-select">character set</label>
           <select id="character-select" aria-label="Character set"></select>
           <details class="custom-characters">

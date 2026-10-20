@@ -25,9 +25,11 @@ button:focus-visible, select:focus-visible {
 }
 
 .app-screen { position: relative; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; }
-.viewer, .output-frame { width: 100%; height: 100%; }
+.viewer { width: 100%; height: 100%; display: grid; place-items: center; }
 
 .output-frame {
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -146,6 +148,8 @@ button:focus-visible, select:focus-visible {
   cursor: pointer;
 }
 
+.start-button:disabled { background: #30352d; color: #7d8578; cursor: not-allowed; }
+
 .button-icon { font-size: 10px; }
 
 .mode-toggle {
@@ -183,6 +187,9 @@ button:focus-visible, select:focus-visible {
 }
 
 .controls-panel select:disabled { color: #777f70; cursor: not-allowed; }
+
+.camera-access-button { min-height: 34px; border: 1px solid #454d3c; border-radius: 3px; background: #242a1f; color: var(--green); font-size: 12px; cursor: pointer; }
+.camera-access-button:disabled { color: #777f70; cursor: wait; }
 
 .custom-characters { color: #b9c0b0; font-size: 12px; }
 .custom-characters summary { width: fit-content; cursor: pointer; }

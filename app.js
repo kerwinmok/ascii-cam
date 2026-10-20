@@ -4,6 +4,7 @@ const context = canvas.getContext('2d', { willReadFrequently: true });
 const output = document.querySelector('#ascii-output');
 const colorCanvas = document.querySelector('#ascii-canvas');
 const colorContext = colorCanvas.getContext('2d');
+const appScreen = document.querySelector('.app-screen');
 const outputFrame = document.querySelector('#output-frame');
 const fpsValue = document.querySelector('#fps-value');
 const asciiResolution = document.querySelector('#ascii-resolution');
@@ -17,6 +18,7 @@ const status = document.querySelector('#camera-status');
 const statusLabel = document.querySelector('#status-label');
 const errorMessage = document.querySelector('#error-message');
 const cameraSelect = document.querySelector('#camera-select');
+const cameraAccessButton = document.querySelector('#camera-access');
 const characterSelect = document.querySelector('#character-select');
 const resolutionSelect = document.querySelector('#resolution-select');
 const customCharactersInput = document.querySelector('#custom-characters');
@@ -69,7 +71,29 @@ function setCameraState(isLive) {
   statusLabel.textContent = isLive ? 'camera live' : 'camera off';
   toggleButton.querySelector('span:last-child').textContent = isLive ? 'stop camera' : 'start camera';
   toggleButton.querySelector('.button-icon').textContent = isLive ? '■' : '▶';
+  updateCameraAvailability();
 }
+
+function updateCameraAvailability() {
+  const hasSelection = Boolean(cameraSelect.value) && !cameraSelect.disabled;
+  toggleButton.disabled = !cameraStream && !hasSelection;
+  if (!cameraStream) {
+    statusLabel.textContent = hasSelection
+      ? 'camera off'
+      : !cameraAccessButton.hidden
+        ? 'allow camera access'
+        : cameraSelect.options.length > 1 ? 'select a camera' : 'no camera found';
+  }
+}
+
+function fitPreviewToAspect(aspect) {
+  const width = Math.min(appScreen.clientWidth, appScreen.clientHeight * aspect);
+  const height = width / aspect;
+  outputFrame.style.width = `${width}px`;
+  outputFrame.style.height = `${height}px`;
+}
+
+fitPreviewToAspect(16 / 9);
 
 function updateResolutionOptions() {
   if (!video.videoWidth || !video.videoHeight) return;
@@ -130,6 +154,11 @@ function renderFrame(timestamp = performance.now()) {
   if (!columns) return;
   const cameraAspect = video.videoWidth / video.videoHeight;
   const rows = Math.max(6, Math.floor((columns * characterCellAspect) / cameraAspect));
+  const cellWidth = outputFrame.clientWidth / columns;
+  const cellHeight = outputFrame.clientHeight / rows;
+  output.style.fontSize = `${cellHeight}px`;
+  output.style.lineHeight = `${cellHeight}px`;
+  output.style.letterSpacing = `${cellWidth - (cellHeight * 0.6)}px`;
   canvas.width = columns;
   canvas.height = rows;
   context.drawImage(video, 0, 0, columns, rows);
@@ -149,12 +178,12 @@ function renderFrame(timestamp = performance.now()) {
   let text = '';
 
   if (colorMode) {
-    const characterWidth = 4.8;
-    colorCanvas.width = Math.ceil(columns * characterWidth);
-    colorCanvas.height = rows * 8;
-    colorCanvas.style.width = `${columns * characterWidth}px`;
+    colorCanvas.width = Math.ceil(outputFrame.clientWidth);
+    colorCanvas.height = Math.ceil(outputFrame.clientHeight);
+    colorCanvas.style.width = `${outputFrame.clientWidth}px`;
+    colorCanvas.style.height = `${outputFrame.clientHeight}px`;
     colorContext.clearRect(0, 0, colorCanvas.width, colorCanvas.height);
-    colorContext.font = "8px 'DM Mono', 'Courier New', monospace";
+    colorContext.font = `${cellHeight}px Consolas, 'Courier New', monospace`;
     colorContext.textBaseline = 'top';
 
     for (let y = 0; y < rows; y += 1) {
@@ -166,7 +195,7 @@ function renderFrame(timestamp = performance.now()) {
         const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
         const characterIndex = Math.floor((luminance / 255) * (characterRamp.length - 1));
         colorContext.fillStyle = `rgb(${red} ${green} ${blue})`;
-        colorContext.fillText(characterRamp[characterIndex], x * characterWidth, y * 8);
+        colorContext.fillText(characterRamp[characterIndex], x * cellWidth, y * cellHeight);
       }
     }
 
@@ -188,6 +217,7 @@ function renderFrame(timestamp = performance.now()) {
 }
 
 async function startCamera() {
+  if (!cameraSelect.value || cameraSelect.disabled) return;
   errorMessage.hidden = true;
   output.hidden = false;
 
@@ -199,12 +229,11 @@ async function startCamera() {
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: cameraSelect.value
-        ? { deviceId: { exact: cameraSelect.value }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { deviceId: { exact: cameraSelect.value }, width: { ideal: 1280 }, height: { ideal: 720 } },
     });
     video.srcObject = cameraStream;
     await video.play();
+    fitPreviewToAspect(video.videoWidth / video.videoHeight);
     updateResolutionOptions();
     setCameraState(true);
     setColorMode(colorMode);
@@ -226,23 +255,32 @@ async function refreshCameras() {
     const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput');
     const selectedId = cameraSelect.value;
     cameraSelect.replaceChildren();
+    const hasCameraNames = cameras.some((camera) => camera.deviceId && camera.label);
+    const placeholder = new Option(
+      cameras.length ? hasCameraNames ? 'select a camera' : 'allow access to list cameras' : 'no camera found',
+      '',
+    );
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    cameraSelect.append(placeholder);
 
     cameras.forEach((camera, index) => {
       const option = document.createElement('option');
-      option.value = camera.deviceId;
+      option.value = camera.deviceId && camera.label ? camera.deviceId : '';
       option.textContent = camera.label || `camera ${index + 1}`;
+      option.disabled = !camera.deviceId || !camera.label;
       cameraSelect.append(option);
     });
 
-    if (cameras.length === 0) {
-      const option = document.createElement('option');
-      option.value = '';
-      option.textContent = 'no cameras found';
-      cameraSelect.append(option);
-    }
-
     if (cameras.some((camera) => camera.deviceId === selectedId)) cameraSelect.value = selectedId;
+    cameraSelect.disabled = !hasCameraNames;
+    cameraAccessButton.hidden = cameras.length === 0 || hasCameraNames;
+    updateCameraAvailability();
   } catch {
+    cameraSelect.replaceChildren(new Option('could not list cameras', ''));
+    cameraSelect.disabled = true;
+    cameraAccessButton.hidden = true;
+    updateCameraAvailability();
     return;
   }
 }
@@ -264,6 +302,7 @@ function stopCamera() {
   cameraResolution.textContent = '-- × --';
   fpsFrameCount = 0;
   fpsWindowStart = 0;
+  fitPreviewToAspect(16 / 9);
 }
 
 toggleButton.addEventListener('click', () => {
@@ -291,9 +330,23 @@ window.addEventListener('keydown', (event) => {
 });
 
 cameraSelect.addEventListener('change', () => {
+  updateCameraAvailability();
   if (cameraStream) {
     stopCamera();
     startCamera();
+  }
+});
+
+cameraAccessButton.addEventListener('click', async () => {
+  cameraAccessButton.disabled = true;
+  try {
+    const temporaryStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+    temporaryStream.getTracks().forEach((track) => track.stop());
+    await refreshCameras();
+  } catch (error) {
+    statusLabel.textContent = error.name === 'NotAllowedError' ? 'camera access blocked' : 'no camera found';
+  } finally {
+    cameraAccessButton.disabled = false;
   }
 });
 
@@ -345,7 +398,10 @@ if (navigator.mediaDevices?.addEventListener) {
   navigator.mediaDevices.addEventListener('devicechange', refreshCameras);
 }
 
+refreshCameras();
+
 window.addEventListener('resize', () => {
+  fitPreviewToAspect(cameraStream ? video.videoWidth / video.videoHeight : 16 / 9);
   if (cameraStream) {
     updateResolutionOptions();
     cancelAnimationFrame(animationFrame);
