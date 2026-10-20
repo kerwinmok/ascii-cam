@@ -3,65 +3,52 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f3f4ef">
+    <meta name="theme-color" content="#10120f">
     <title>ascii cam</title>
     <link rel="stylesheet" href="styles.css">
     <script src="app.js" defer></script>
   </head>
   <body>
-    <header class="topbar">
-      <a class="wordmark" href="./" aria-label="ascii cam home"><span>ascii</span><i>/</i>cam</a>
-      <p class="topbar-note">live camera type</p>
-      <div class="camera-picker">
-        <button class="menu-button" id="camera-menu-toggle" type="button" aria-label="Choose camera" aria-controls="camera-menu" aria-expanded="false">
-          <span></span><span></span><span></span>
-        </button>
-        <div class="camera-menu" id="camera-menu" hidden>
-          <label for="camera-select">CAMERA SOURCE</label>
-          <select id="camera-select" aria-label="Camera source">
-            <option value="">default camera</option>
-          </select>
+    <main class="app-screen">
+      <section class="viewer" aria-label="ASCII camera preview">
+        <div class="output-frame" id="output-frame">
+          <pre class="ascii-output" id="ascii-output" aria-label="Camera converted to ASCII"></pre>
+          <canvas class="ascii-canvas" id="ascii-canvas" aria-label="Camera converted to color ASCII" hidden></canvas>
+          <p class="error-message" id="error-message" role="status" hidden></p>
         </div>
-      </div>
-      <div class="status" id="camera-status" aria-live="polite">
-        <span class="status-dot"></span>
-        <span id="status-label">camera off</span>
-      </div>
-    </header>
-
-    <main class="workspace">
-      <section class="intro" aria-labelledby="page-title">
-        <div>
-          <p class="eyebrow">REAL-TIME ASCII CAMERA</p>
-          <h1 id="page-title">see the world<br><span>in characters</span></h1>
-        </div>
-        <button class="start-button" id="camera-toggle" type="button">
-          <span class="button-icon" aria-hidden="true">▶</span>
-          <span>start camera</span>
-        </button>
       </section>
 
-      <section class="viewer" aria-label="ASCII camera preview">
-        <div class="viewer-bar">
-          <span class="viewer-label"><span class="live-dot"></span> LIVE OUTPUT</span>
+      <button class="controls-toggle" id="controls-toggle" type="button" aria-label="Open controls" aria-controls="controls-overlay" aria-expanded="false" title="Controls (Escape)">
+        <span></span><span></span><span></span><kbd>esc</kbd>
+      </button>
+
+      <div class="controls-overlay" id="controls-overlay" hidden>
+        <section class="controls-panel" role="dialog" aria-modal="true" aria-labelledby="controls-title">
+          <header class="panel-header">
+            <h1 id="controls-title">ascii cam</h1>
+            <button class="close-button" id="controls-close" type="button" aria-label="Close controls">×</button>
+          </header>
+          <button class="start-button" id="camera-toggle" type="button">
+            <span class="button-icon" aria-hidden="true">▶</span>
+            <span>start camera</span>
+          </button>
           <div class="mode-toggle" role="group" aria-label="Output color mode">
             <button id="mono-mode" type="button" aria-pressed="true">mono</button>
             <button id="color-mode" type="button" aria-pressed="false">color</button>
           </div>
-          <span class="viewer-size" id="output-size">-- × --</span>
-        </div>
-        <div class="output-frame" id="output-frame">
-          <pre class="ascii-output" id="ascii-output" aria-label="Camera converted to ASCII">turn on camera to begin</pre>
-          <canvas class="ascii-canvas" id="ascii-canvas" aria-label="Camera converted to color ASCII" hidden></canvas>
-          <p class="error-message" id="error-message" role="status" hidden></p>
-        </div>
-        <div class="viewer-footer">
-          <span id="mode-label">MONOCHROME</span>
-          <span>CHARACTER SET <b>@%#*+=-:.</b></span>
-        </div>
-      </section>
+          <label class="field-label" for="camera-select">camera</label>
+          <select id="camera-select" aria-label="Camera source">
+            <option value="">default camera</option>
+          </select>
+          <label class="field-label" for="character-select">character set</label>
+          <select id="character-select" aria-label="Character set"></select>
+          <div class="status" id="camera-status" aria-live="polite">
+            <span class="status-dot"></span>
+            <span id="status-label">camera off</span>
+          </div>
+        </section>
+      </div>
 
-      <p class="privacy-note">your camera stays on this device</p>
       <video id="camera-video" autoplay muted playsinline hidden></video>
       <canvas id="sample-canvas" hidden></canvas>
     </main>

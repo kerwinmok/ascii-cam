@@ -6,27 +6,48 @@ const colorCanvas = document.querySelector('#ascii-canvas');
 const colorContext = colorCanvas.getContext('2d');
 const outputFrame = document.querySelector('#output-frame');
 const toggleButton = document.querySelector('#camera-toggle');
+const controlsToggle = document.querySelector('#controls-toggle');
+const controlsOverlay = document.querySelector('#controls-overlay');
+const controlsClose = document.querySelector('#controls-close');
 const status = document.querySelector('#camera-status');
 const statusLabel = document.querySelector('#status-label');
-const outputSize = document.querySelector('#output-size');
 const errorMessage = document.querySelector('#error-message');
-const menuToggle = document.querySelector('#camera-menu-toggle');
-const cameraMenu = document.querySelector('#camera-menu');
 const cameraSelect = document.querySelector('#camera-select');
+const characterSelect = document.querySelector('#character-select');
 const monoModeButton = document.querySelector('#mono-mode');
 const colorModeButton = document.querySelector('#color-mode');
-const modeLabel = document.querySelector('#mode-label');
-const characterRamp = '@%#*+=-:. ';
+const characterSets = [
+  { name: 'detailed', ramp: '@%#W$9876543210?!+=-:;,. ' },
+  { name: 'balanced', ramp: '@%#*+=-:. ' },
+  { name: 'simple', ramp: '@#*:. ' },
+];
 
 let cameraStream;
 let animationFrame;
 let colorMode = false;
+let characterRamp = characterSets[1].ramp;
+let lastFrameTime = 0;
+
+characterSets.forEach(({ name, ramp }) => {
+  const option = document.createElement('option');
+  option.value = ramp;
+  option.textContent = name;
+  characterSelect.append(option);
+});
+characterSelect.value = characterRamp;
+
+function setControlsOpen(open) {
+  controlsOverlay.hidden = !open;
+  controlsToggle.setAttribute('aria-expanded', String(open));
+  controlsToggle.setAttribute('aria-label', open ? 'Close controls' : 'Open controls');
+  if (open) toggleButton.focus();
+  else controlsToggle.focus();
+}
 
 function setColorMode(enabled) {
   colorMode = enabled;
   monoModeButton.setAttribute('aria-pressed', String(!enabled));
   colorModeButton.setAttribute('aria-pressed', String(enabled));
-  modeLabel.textContent = enabled ? 'FULL COLOR' : 'MONOCHROME';
   output.hidden = Boolean(cameraStream && enabled);
   colorCanvas.hidden = !cameraStream || !enabled;
 }
@@ -41,14 +62,20 @@ function setCameraState(isLive) {
 function showError(message) {
   errorMessage.textContent = message;
   errorMessage.hidden = false;
+  colorCanvas.hidden = true;
   output.hidden = true;
 }
 
-function renderFrame() {
+function renderFrame(timestamp = performance.now()) {
   if (!cameraStream || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+  if (timestamp - lastFrameTime < 33) {
+    animationFrame = requestAnimationFrame(renderFrame);
+    return;
+  }
+  lastFrameTime = timestamp;
 
-  const columns = Math.max(24, Math.min(150, Math.floor(outputFrame.clientWidth / 4.8)));
-  const rows = Math.max(12, Math.floor(outputFrame.clientHeight / 8));
+  const columns = Math.max(24, Math.min(300, Math.floor(outputFrame.clientWidth / 4.8)));
+  const rows = Math.max(12, Math.min(120, Math.floor(outputFrame.clientHeight / 8)));
   canvas.width = columns;
   canvas.height = rows;
   context.drawImage(video, 0, 0, columns, rows);
@@ -78,22 +105,20 @@ function renderFrame() {
       }
     }
 
-    animationFrame = requestAnimationFrame(renderFrame);
-    return;
-  }
-
-  for (let y = 0; y < rows; y += 1) {
-    for (let x = 0; x < columns; x += 1) {
-      const pixel = (y * columns + x) * 4;
-      const luminance = pixels[pixel] * 0.299 + pixels[pixel + 1] * 0.587 + pixels[pixel + 2] * 0.114;
-      const characterIndex = Math.floor((luminance / 255) * (characterRamp.length - 1));
-      text += characterRamp[characterIndex];
+  } else {
+    for (let y = 0; y < rows; y += 1) {
+      for (let x = 0; x < columns; x += 1) {
+        const pixel = (y * columns + x) * 4;
+        const luminance = pixels[pixel] * 0.299 + pixels[pixel + 1] * 0.587 + pixels[pixel + 2] * 0.114;
+        const characterIndex = Math.floor((luminance / 255) * (characterRamp.length - 1));
+        text += characterRamp[characterIndex];
+      }
+      if (y < rows - 1) text += '\n';
     }
-    if (y < rows - 1) text += '\n';
+
+    output.textContent = text;
   }
 
-  output.textContent = text;
-  outputSize.textContent = `${columns} × ${rows}`;
   animationFrame = requestAnimationFrame(renderFrame);
 }
 
@@ -119,36 +144,41 @@ async function startCamera() {
     setColorMode(colorMode);
     await refreshCameras();
     renderFrame();
+    setControlsOpen(false);
   } catch (error) {
     const message = error.name === 'NotAllowedError'
       ? 'Camera access was blocked. Allow camera access in your browser and try again.'
       : 'No camera was found. Connect a camera and try again.';
-    showError(message);
     stopCamera();
+    showError(message);
   }
 }
 
 async function refreshCameras() {
   if (!navigator.mediaDevices?.enumerateDevices) return;
-  const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput');
-  const selectedId = cameraSelect.value;
-  cameraSelect.replaceChildren();
+  try {
+    const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput');
+    const selectedId = cameraSelect.value;
+    cameraSelect.replaceChildren();
 
-  cameras.forEach((camera, index) => {
-    const option = document.createElement('option');
-    option.value = camera.deviceId;
-    option.textContent = camera.label || `camera ${index + 1}`;
-    cameraSelect.append(option);
-  });
+    cameras.forEach((camera, index) => {
+      const option = document.createElement('option');
+      option.value = camera.deviceId;
+      option.textContent = camera.label || `camera ${index + 1}`;
+      cameraSelect.append(option);
+    });
 
-  if (cameras.length === 0) {
-    const option = document.createElement('option');
-    option.value = '';
-    option.textContent = 'no cameras found';
-    cameraSelect.append(option);
+    if (cameras.length === 0) {
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = 'no cameras found';
+      cameraSelect.append(option);
+    }
+
+    if (cameras.some((camera) => camera.deviceId === selectedId)) cameraSelect.value = selectedId;
+  } catch {
+    return;
   }
-
-  if (cameras.some((camera) => camera.deviceId === selectedId)) cameraSelect.value = selectedId;
 }
 
 function stopCamera() {
@@ -159,8 +189,7 @@ function stopCamera() {
   setCameraState(false);
   output.hidden = false;
   colorCanvas.hidden = true;
-  outputSize.textContent = '-- × --';
-  output.textContent = 'turn on camera to begin';
+  output.textContent = '';
 }
 
 toggleButton.addEventListener('click', () => {
@@ -168,11 +197,23 @@ toggleButton.addEventListener('click', () => {
   else startCamera();
 });
 
-menuToggle.addEventListener('click', async () => {
-  const isOpen = menuToggle.getAttribute('aria-expanded') === 'true';
-  menuToggle.setAttribute('aria-expanded', String(!isOpen));
-  cameraMenu.hidden = isOpen;
-  if (!isOpen) await refreshCameras();
+controlsToggle.addEventListener('click', async () => {
+  setControlsOpen(controlsOverlay.hidden);
+  if (!controlsOverlay.hidden) await refreshCameras();
+});
+
+controlsClose.addEventListener('click', () => setControlsOpen(false));
+
+controlsOverlay.addEventListener('click', (event) => {
+  if (event.target === controlsOverlay) setControlsOpen(false);
+});
+
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !event.repeat) {
+    event.preventDefault();
+    setControlsOpen(controlsOverlay.hidden);
+    if (!controlsOverlay.hidden) refreshCameras();
+  }
 });
 
 cameraSelect.addEventListener('change', () => {
@@ -184,6 +225,9 @@ cameraSelect.addEventListener('change', () => {
 
 monoModeButton.addEventListener('click', () => setColorMode(false));
 colorModeButton.addEventListener('click', () => setColorMode(true));
+characterSelect.addEventListener('change', () => {
+  characterRamp = characterSelect.value;
+});
 
 if (navigator.mediaDevices?.addEventListener) {
   navigator.mediaDevices.addEventListener('devicechange', refreshCameras);
