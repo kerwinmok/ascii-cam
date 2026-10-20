@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f3f4ef">
+    <title>ascii cam</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="wordmark" href="./" aria-label="ascii cam home"><span>ascii</span><i>/</i>cam</a>
+      <p class="topbar-note">live camera type</p>
+      <div class="status" id="camera-status" aria-live="polite">
+        <span class="status-dot"></span>
+        <span id="status-label">camera off</span>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">REAL-TIME ASCII CAMERA</p>
+          <h1 id="page-title">see the world<br><span>in characters</span></h1>
+        </div>
+        <button class="start-button" id="camera-toggle" type="button">
+          <span class="button-icon" aria-hidden="true">▶</span>
+          <span>start camera</span>
+        </button>
+      </section>
+
+      <section class="viewer" aria-label="ASCII camera preview">
+        <div class="viewer-bar">
+          <span class="viewer-label"><span class="live-dot"></span> LIVE OUTPUT</span>
+          <span class="viewer-size" id="output-size">-- × --</span>
+        </div>
+        <div class="output-frame" id="output-frame">
+          <pre class="ascii-output" id="ascii-output" aria-label="Camera converted to ASCII">turn on camera to begin</pre>
+          <p class="error-message" id="error-message" role="status" hidden></p>
+        </div>
+        <div class="viewer-footer">
+          <span>MONOCHROME</span>
+          <span>CHARACTER SET <b>@%#*+=-:.</b></span>
+        </div>
+      </section>
+
+      <p class="privacy-note">your camera stays on this device</p>
+      <video id="camera-video" autoplay muted playsinline hidden></video>
+      <canvas id="sample-canvas" hidden></canvas>
+    </main>
+  </body>
+</html>
