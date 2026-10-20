@@ -2,6 +2,8 @@ const video = document.querySelector('#camera-video');
 const canvas = document.querySelector('#sample-canvas');
 const context = canvas.getContext('2d', { willReadFrequently: true });
 const output = document.querySelector('#ascii-output');
+const colorCanvas = document.querySelector('#ascii-canvas');
+const colorContext = colorCanvas.getContext('2d');
 const outputFrame = document.querySelector('#output-frame');
 const toggleButton = document.querySelector('#camera-toggle');
 const status = document.querySelector('#camera-status');
@@ -11,10 +13,23 @@ const errorMessage = document.querySelector('#error-message');
 const menuToggle = document.querySelector('#camera-menu-toggle');
 const cameraMenu = document.querySelector('#camera-menu');
 const cameraSelect = document.querySelector('#camera-select');
+const monoModeButton = document.querySelector('#mono-mode');
+const colorModeButton = document.querySelector('#color-mode');
+const modeLabel = document.querySelector('#mode-label');
 const characterRamp = '@%#*+=-:. ';
 
 let cameraStream;
 let animationFrame;
+let colorMode = false;
+
+function setColorMode(enabled) {
+  colorMode = enabled;
+  monoModeButton.setAttribute('aria-pressed', String(!enabled));
+  colorModeButton.setAttribute('aria-pressed', String(enabled));
+  modeLabel.textContent = enabled ? 'FULL COLOR' : 'MONOCHROME';
+  output.hidden = Boolean(cameraStream && enabled);
+  colorCanvas.hidden = !cameraStream || !enabled;
+}
 
 function setCameraState(isLive) {
   status.classList.toggle('is-live', isLive);
@@ -40,6 +55,32 @@ function renderFrame() {
 
   const pixels = context.getImageData(0, 0, columns, rows).data;
   let text = '';
+
+  if (colorMode) {
+    const characterWidth = 4.8;
+    colorCanvas.width = Math.ceil(columns * characterWidth);
+    colorCanvas.height = rows * 8;
+    colorCanvas.style.width = `${columns * characterWidth}px`;
+    colorContext.clearRect(0, 0, colorCanvas.width, colorCanvas.height);
+    colorContext.font = "8px 'DM Mono', 'Courier New', monospace";
+    colorContext.textBaseline = 'top';
+
+    for (let y = 0; y < rows; y += 1) {
+      for (let x = 0; x < columns; x += 1) {
+        const pixel = (y * columns + x) * 4;
+        const red = pixels[pixel];
+        const green = pixels[pixel + 1];
+        const blue = pixels[pixel + 2];
+        const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+        const characterIndex = Math.floor((luminance / 255) * (characterRamp.length - 1));
+        colorContext.fillStyle = `rgb(${red} ${green} ${blue})`;
+        colorContext.fillText(characterRamp[characterIndex], x * characterWidth, y * 8);
+      }
+    }
+
+    animationFrame = requestAnimationFrame(renderFrame);
+    return;
+  }
 
   for (let y = 0; y < rows; y += 1) {
     for (let x = 0; x < columns; x += 1) {
@@ -75,6 +116,7 @@ async function startCamera() {
     video.srcObject = cameraStream;
     await video.play();
     setCameraState(true);
+    setColorMode(colorMode);
     await refreshCameras();
     renderFrame();
   } catch (error) {
@@ -115,6 +157,8 @@ function stopCamera() {
   cameraStream = undefined;
   video.srcObject = null;
   setCameraState(false);
+  output.hidden = false;
+  colorCanvas.hidden = true;
   outputSize.textContent = '-- × --';
   output.textContent = 'turn on camera to begin';
 }
@@ -137,6 +181,9 @@ cameraSelect.addEventListener('change', () => {
     startCamera();
   }
 });
+
+monoModeButton.addEventListener('click', () => setColorMode(false));
+colorModeButton.addEventListener('click', () => setColorMode(true));
 
 if (navigator.mediaDevices?.addEventListener) {
   navigator.mediaDevices.addEventListener('devicechange', refreshCameras);

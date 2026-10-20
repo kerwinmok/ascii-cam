@@ -44,14 +44,19 @@
       <section class="viewer" aria-label="ASCII camera preview">
         <div class="viewer-bar">
           <span class="viewer-label"><span class="live-dot"></span> LIVE OUTPUT</span>
+          <div class="mode-toggle" role="group" aria-label="Output color mode">
+            <button id="mono-mode" type="button" aria-pressed="true">mono</button>
+            <button id="color-mode" type="button" aria-pressed="false">color</button>
+          </div>
           <span class="viewer-size" id="output-size">-- × --</span>
         </div>
         <div class="output-frame" id="output-frame">
           <pre class="ascii-output" id="ascii-output" aria-label="Camera converted to ASCII">turn on camera to begin</pre>
+          <canvas class="ascii-canvas" id="ascii-canvas" aria-label="Camera converted to color ASCII" hidden></canvas>
           <p class="error-message" id="error-message" role="status" hidden></p>
         </div>
         <div class="viewer-footer">
-          <span>MONOCHROME</span>
+          <span id="mode-label">MONOCHROME</span>
           <span>CHARACTER SET <b>@%#*+=-:.</b></span>
         </div>
       </section>
