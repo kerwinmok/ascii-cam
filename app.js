@@ -5,6 +5,10 @@ const output = document.querySelector('#ascii-output');
 const colorCanvas = document.querySelector('#ascii-canvas');
 const colorContext = colorCanvas.getContext('2d');
 const outputFrame = document.querySelector('#output-frame');
+const fpsValue = document.querySelector('#fps-value');
+const asciiResolution = document.querySelector('#ascii-resolution');
+const asciiCells = document.querySelector('#ascii-cells');
+const cameraResolution = document.querySelector('#camera-resolution');
 const toggleButton = document.querySelector('#camera-toggle');
 const controlsToggle = document.querySelector('#controls-toggle');
 const controlsOverlay = document.querySelector('#controls-overlay');
@@ -14,19 +18,27 @@ const statusLabel = document.querySelector('#status-label');
 const errorMessage = document.querySelector('#error-message');
 const cameraSelect = document.querySelector('#camera-select');
 const characterSelect = document.querySelector('#character-select');
+const resolutionSelect = document.querySelector('#resolution-select');
+const customCharactersInput = document.querySelector('#custom-characters');
+const applyCharactersButton = document.querySelector('#apply-characters');
+const characterError = document.querySelector('#character-error');
 const monoModeButton = document.querySelector('#mono-mode');
 const colorModeButton = document.querySelector('#color-mode');
 const characterSets = [
-  { name: 'detailed', ramp: '@%#W$9876543210?!+=-:;,. ' },
+  { name: 'detailed', ramp: '@%#W$9876543210?!+=-:;,.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ' },
   { name: 'balanced', ramp: '@%#*+=-:. ' },
   { name: 'simple', ramp: '@#*:. ' },
+  { name: 'letters only', ramp: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz' },
 ];
 
 let cameraStream;
 let animationFrame;
 let colorMode = false;
-let characterRamp = characterSets[1].ramp;
+let characterRamp = Array.from(characterSets[1].ramp);
 let lastFrameTime = 0;
+let fpsWindowStart = 0;
+let fpsFrameCount = 0;
+const characterCellAspect = 4.8 / 8;
 
 characterSets.forEach(({ name, ramp }) => {
   const option = document.createElement('option');
@@ -34,7 +46,7 @@ characterSets.forEach(({ name, ramp }) => {
   option.textContent = name;
   characterSelect.append(option);
 });
-characterSelect.value = characterRamp;
+characterSelect.value = characterRamp.join('');
 
 function setControlsOpen(open) {
   controlsOverlay.hidden = !open;
@@ -59,6 +71,46 @@ function setCameraState(isLive) {
   toggleButton.querySelector('.button-icon').textContent = isLive ? '■' : '▶';
 }
 
+function updateResolutionOptions() {
+  if (!video.videoWidth || !video.videoHeight) return;
+
+  const cameraAspect = video.videoWidth / video.videoHeight;
+  const maxRows = Math.min(120, Math.floor(outputFrame.clientHeight / 8));
+  const maxColumns = Math.max(12, Math.min(
+    300,
+    Math.floor(outputFrame.clientWidth / 4.8),
+    Math.floor(video.videoWidth / 2),
+    Math.floor((maxRows * cameraAspect) / characterCellAspect),
+  ));
+  const previousColumns = Number(resolutionSelect.value);
+  const tiers = [
+    { name: 'low', scale: 0.25 },
+    { name: 'medium', scale: 0.5 },
+    { name: 'high', scale: 0.75 },
+    { name: 'max detail', scale: 1 },
+  ];
+  const options = tiers.map(({ name, scale }) => {
+    const columns = Math.max(12, Math.floor(maxColumns * scale));
+    const rows = Math.max(6, Math.floor((columns * characterCellAspect) / cameraAspect));
+    return { name, columns, rows };
+  }).filter((option, index, all) => all.findIndex((candidate) => candidate.columns === option.columns) === index);
+
+  resolutionSelect.replaceChildren(...options.map(({ name, columns, rows }) => {
+    const option = document.createElement('option');
+    option.value = String(columns);
+    option.textContent = `${name} · ${columns} × ${rows}`;
+    return option;
+  }));
+  resolutionSelect.disabled = false;
+
+  if (previousColumns) {
+    const nearest = options.reduce((best, option) => Math.abs(option.columns - previousColumns) < Math.abs(best.columns - previousColumns) ? option : best);
+    resolutionSelect.value = String(nearest.columns);
+  } else {
+    resolutionSelect.selectedIndex = Math.min(2, options.length - 1);
+  }
+}
+
 function showError(message) {
   errorMessage.textContent = message;
   errorMessage.hidden = false;
@@ -74,11 +126,24 @@ function renderFrame(timestamp = performance.now()) {
   }
   lastFrameTime = timestamp;
 
-  const columns = Math.max(24, Math.min(300, Math.floor(outputFrame.clientWidth / 4.8)));
-  const rows = Math.max(12, Math.min(120, Math.floor(outputFrame.clientHeight / 8)));
+  const columns = Number(resolutionSelect.value);
+  if (!columns) return;
+  const cameraAspect = video.videoWidth / video.videoHeight;
+  const rows = Math.max(6, Math.floor((columns * characterCellAspect) / cameraAspect));
   canvas.width = columns;
   canvas.height = rows;
   context.drawImage(video, 0, 0, columns, rows);
+
+  asciiResolution.textContent = `${columns} × ${rows}`;
+  asciiCells.textContent = `${(columns * rows).toLocaleString()} cells`;
+  cameraResolution.textContent = `${video.videoWidth} × ${video.videoHeight}`;
+  fpsFrameCount += 1;
+  if (!fpsWindowStart) fpsWindowStart = timestamp;
+  if (timestamp - fpsWindowStart >= 1000) {
+    fpsValue.textContent = String(Math.round((fpsFrameCount * 1000) / (timestamp - fpsWindowStart)));
+    fpsFrameCount = 0;
+    fpsWindowStart = timestamp;
+  }
 
   const pixels = context.getImageData(0, 0, columns, rows).data;
   let text = '';
@@ -140,6 +205,7 @@ async function startCamera() {
     });
     video.srcObject = cameraStream;
     await video.play();
+    updateResolutionOptions();
     setCameraState(true);
     setColorMode(colorMode);
     await refreshCameras();
@@ -190,6 +256,14 @@ function stopCamera() {
   output.hidden = false;
   colorCanvas.hidden = true;
   output.textContent = '';
+  resolutionSelect.replaceChildren(new Option('start camera to see resolutions', ''));
+  resolutionSelect.disabled = true;
+  fpsValue.textContent = '--';
+  asciiResolution.textContent = '-- × --';
+  asciiCells.textContent = '-- cells';
+  cameraResolution.textContent = '-- × --';
+  fpsFrameCount = 0;
+  fpsWindowStart = 0;
 }
 
 toggleButton.addEventListener('click', () => {
@@ -226,7 +300,45 @@ cameraSelect.addEventListener('change', () => {
 monoModeButton.addEventListener('click', () => setColorMode(false));
 colorModeButton.addEventListener('click', () => setColorMode(true));
 characterSelect.addEventListener('change', () => {
-  characterRamp = characterSelect.value;
+  characterRamp = Array.from(characterSelect.value);
+});
+
+applyCharactersButton.addEventListener('click', () => {
+  const input = customCharactersInput.value.trim();
+  let characters;
+
+  try {
+    characters = JSON.parse(input);
+  } catch {
+    characters = input;
+  }
+
+  if (Array.isArray(characters)) {
+    if (characters.some((character) => typeof character !== 'string' || Array.from(character).length !== 1)) {
+      characterError.textContent = 'use a list of single characters';
+      characterError.hidden = false;
+      return;
+    }
+    characters = characters.join('');
+  }
+
+  if (typeof characters !== 'string' || Array.from(characters).length < 2) {
+    characterError.textContent = 'enter at least two characters';
+    characterError.hidden = false;
+    return;
+  }
+
+  characterRamp = Array.from(characters);
+  let customOption = Array.from(characterSelect.options).find((option) => option.dataset.custom === 'true');
+  if (!customOption) {
+    customOption = document.createElement('option');
+    customOption.dataset.custom = 'true';
+    characterSelect.append(customOption);
+  }
+  customOption.value = characters;
+  customOption.textContent = 'custom';
+  characterSelect.value = characters;
+  characterError.hidden = true;
 });
 
 if (navigator.mediaDevices?.addEventListener) {
@@ -235,6 +347,7 @@ if (navigator.mediaDevices?.addEventListener) {
 
 window.addEventListener('resize', () => {
   if (cameraStream) {
+    updateResolutionOptions();
     cancelAnimationFrame(animationFrame);
     renderFrame();
   }
