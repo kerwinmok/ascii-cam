@@ -40,6 +40,7 @@ let characterRamp = Array.from(characterSets[1].ramp);
 let lastFrameTime = 0;
 let fpsWindowStart = 0;
 let fpsFrameCount = 0;
+let renderGeometry;
 const characterCellAspect = 4.8 / 8;
 
 characterSets.forEach(({ name, ramp }) => {
@@ -135,6 +136,36 @@ function updateResolutionOptions() {
   }
 }
 
+function configureRenderGeometry(columns, rows) {
+  const frameWidth = outputFrame.clientWidth;
+  const frameHeight = outputFrame.clientHeight;
+  const key = `${columns}:${rows}:${frameWidth}:${frameHeight}`;
+
+  if (renderGeometry?.key === key) return renderGeometry;
+
+  const cellWidth = frameWidth / columns;
+  const cellHeight = frameHeight / rows;
+  output.style.fontSize = `${cellHeight}px`;
+  output.style.lineHeight = `${cellHeight}px`;
+  output.style.letterSpacing = `${cellWidth - (cellHeight * 0.6)}px`;
+
+  const canvasWidth = Math.ceil(frameWidth);
+  const canvasHeight = Math.ceil(frameHeight);
+  if (colorCanvas.width !== canvasWidth || colorCanvas.height !== canvasHeight) {
+    colorCanvas.width = canvasWidth;
+    colorCanvas.height = canvasHeight;
+  }
+  colorCanvas.style.width = `${frameWidth}px`;
+  colorCanvas.style.height = `${frameHeight}px`;
+  colorContext.font = `${cellHeight}px Consolas, 'Courier New', monospace`;
+  colorContext.textBaseline = 'top';
+
+  asciiResolution.textContent = `${columns} × ${rows}`;
+  asciiCells.textContent = `${(columns * rows).toLocaleString()} cells`;
+  renderGeometry = { key, cellWidth, cellHeight };
+  return renderGeometry;
+}
+
 function showError(message) {
   errorMessage.textContent = message;
   errorMessage.hidden = false;
@@ -154,18 +185,11 @@ function renderFrame(timestamp = performance.now()) {
   if (!columns) return;
   const cameraAspect = video.videoWidth / video.videoHeight;
   const rows = Math.max(6, Math.floor((columns * characterCellAspect) / cameraAspect));
-  const cellWidth = outputFrame.clientWidth / columns;
-  const cellHeight = outputFrame.clientHeight / rows;
-  output.style.fontSize = `${cellHeight}px`;
-  output.style.lineHeight = `${cellHeight}px`;
-  output.style.letterSpacing = `${cellWidth - (cellHeight * 0.6)}px`;
-  canvas.width = columns;
-  canvas.height = rows;
+  const { cellWidth, cellHeight } = configureRenderGeometry(columns, rows);
+  if (canvas.width !== columns) canvas.width = columns;
+  if (canvas.height !== rows) canvas.height = rows;
   context.drawImage(video, 0, 0, columns, rows);
 
-  asciiResolution.textContent = `${columns} × ${rows}`;
-  asciiCells.textContent = `${(columns * rows).toLocaleString()} cells`;
-  cameraResolution.textContent = `${video.videoWidth} × ${video.videoHeight}`;
   fpsFrameCount += 1;
   if (!fpsWindowStart) fpsWindowStart = timestamp;
   if (timestamp - fpsWindowStart >= 1000) {
@@ -178,13 +202,7 @@ function renderFrame(timestamp = performance.now()) {
   let text = '';
 
   if (colorMode) {
-    colorCanvas.width = Math.ceil(outputFrame.clientWidth);
-    colorCanvas.height = Math.ceil(outputFrame.clientHeight);
-    colorCanvas.style.width = `${outputFrame.clientWidth}px`;
-    colorCanvas.style.height = `${outputFrame.clientHeight}px`;
     colorContext.clearRect(0, 0, colorCanvas.width, colorCanvas.height);
-    colorContext.font = `${cellHeight}px Consolas, 'Courier New', monospace`;
-    colorContext.textBaseline = 'top';
 
     for (let y = 0; y < rows; y += 1) {
       for (let x = 0; x < columns; x += 1) {
@@ -235,6 +253,7 @@ async function startCamera() {
     await video.play();
     fitPreviewToAspect(video.videoWidth / video.videoHeight);
     updateResolutionOptions();
+    cameraResolution.textContent = `${video.videoWidth} × ${video.videoHeight}`;
     setCameraState(true);
     setColorMode(colorMode);
     await refreshCameras();
