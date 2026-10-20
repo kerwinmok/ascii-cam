@@ -12,6 +12,17 @@
     <header class="topbar">
       <a class="wordmark" href="./" aria-label="ascii cam home"><span>ascii</span><i>/</i>cam</a>
       <p class="topbar-note">live camera type</p>
+      <div class="camera-picker">
+        <button class="menu-button" id="camera-menu-toggle" type="button" aria-label="Choose camera" aria-controls="camera-menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="camera-menu" id="camera-menu" hidden>
+          <label for="camera-select">CAMERA SOURCE</label>
+          <select id="camera-select" aria-label="Camera source">
+            <option value="">default camera</option>
+          </select>
+        </div>
+      </div>
       <div class="status" id="camera-status" aria-live="polite">
         <span class="status-dot"></span>
         <span id="status-label">camera off</span>

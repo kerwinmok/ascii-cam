@@ -44,8 +44,42 @@ button, select { font: inherit; }
 .wordmark i { padding: 0 3px; color: #7aa52d; font-style: normal; }
 .topbar-note { margin: 0 0 0 28px; color: var(--muted); font-size: 13px; }
 
+.camera-picker { position: relative; margin-left: auto; }
+
+.menu-button {
+  width: 40px;
+  height: 40px;
+  padding: 11px 9px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.menu-button span { width: 20px; height: 2px; background: var(--ink); }
+.menu-button:hover { background: #e8ebe2; }
+
+.camera-menu {
+  position: absolute;
+  z-index: 2;
+  top: 48px;
+  right: 0;
+  width: 240px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: 0 8px 24px #20231f1a;
+}
+
+.camera-menu label { display: block; margin-bottom: 9px; color: var(--muted); font-family: var(--mono); font-size: 10px; }
+.camera-menu select { width: 100%; min-height: 38px; padding: 0 8px; border: 1px solid var(--line); border-radius: 3px; background: white; color: var(--ink); }
+
 .status {
-  margin-left: auto;
+  margin-left: 18px;
   display: flex;
   align-items: center;
   gap: 8px;

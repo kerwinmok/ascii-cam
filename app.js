@@ -8,6 +8,9 @@ const status = document.querySelector('#camera-status');
 const statusLabel = document.querySelector('#status-label');
 const outputSize = document.querySelector('#output-size');
 const errorMessage = document.querySelector('#error-message');
+const menuToggle = document.querySelector('#camera-menu-toggle');
+const cameraMenu = document.querySelector('#camera-menu');
+const cameraSelect = document.querySelector('#camera-select');
 const characterRamp = '@%#*+=-:. ';
 
 let cameraStream;
@@ -65,11 +68,14 @@ async function startCamera() {
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: cameraSelect.value
+        ? { deviceId: { exact: cameraSelect.value }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
     });
     video.srcObject = cameraStream;
     await video.play();
     setCameraState(true);
+    await refreshCameras();
     renderFrame();
   } catch (error) {
     const message = error.name === 'NotAllowedError'
@@ -78,6 +84,29 @@ async function startCamera() {
     showError(message);
     stopCamera();
   }
+}
+
+async function refreshCameras() {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  const cameras = (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === 'videoinput');
+  const selectedId = cameraSelect.value;
+  cameraSelect.replaceChildren();
+
+  cameras.forEach((camera, index) => {
+    const option = document.createElement('option');
+    option.value = camera.deviceId;
+    option.textContent = camera.label || `camera ${index + 1}`;
+    cameraSelect.append(option);
+  });
+
+  if (cameras.length === 0) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'no cameras found';
+    cameraSelect.append(option);
+  }
+
+  if (cameras.some((camera) => camera.deviceId === selectedId)) cameraSelect.value = selectedId;
 }
 
 function stopCamera() {
@@ -94,6 +123,24 @@ toggleButton.addEventListener('click', () => {
   if (cameraStream) stopCamera();
   else startCamera();
 });
+
+menuToggle.addEventListener('click', async () => {
+  const isOpen = menuToggle.getAttribute('aria-expanded') === 'true';
+  menuToggle.setAttribute('aria-expanded', String(!isOpen));
+  cameraMenu.hidden = isOpen;
+  if (!isOpen) await refreshCameras();
+});
+
+cameraSelect.addEventListener('change', () => {
+  if (cameraStream) {
+    stopCamera();
+    startCamera();
+  }
+});
+
+if (navigator.mediaDevices?.addEventListener) {
+  navigator.mediaDevices.addEventListener('devicechange', refreshCameras);
+}
 
 window.addEventListener('resize', () => {
   if (cameraStream) {
